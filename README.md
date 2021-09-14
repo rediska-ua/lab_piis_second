@@ -1,2 +1,1 @@
-# Second laboratory work on projecting of intelectual systems
-
+# The second laboratory work on the design of intelligent systems
