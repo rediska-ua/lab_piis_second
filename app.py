@@ -3,6 +3,7 @@ from settings import *
 import sys
 from player import *
 from enemy import *
+from timeit import default_timer as timer
 
 pygame.init()
 vec = pygame.math.Vector2
@@ -21,6 +22,7 @@ class App:
         self.enemies = []
         self.enemy_position = []
         self.player_position = None
+        self.grid = [[0 for x in range(28)] for x in range(30)]
 
         self.load()
 
@@ -38,6 +40,10 @@ class App:
                 self.playing_events()
                 self.playing_update()
                 self.playing_draw()
+
+            elif self.state == 'pause':
+                self.pause_events()
+                self.pause_draw()
 
             elif self.state == 'endgame':
                 self.endgame_events()
@@ -71,7 +77,7 @@ class App:
                         self.coins.append(vec(x_index, y_index))
                     elif char == 'P':
                         self.player_position = [x_index, y_index]
-                    elif char in ['2', '3', '4', '5']:
+                    elif char == '2':
                         self.enemy_position.append([x_index, y_index])
                     elif char == 'B':
                         pygame.draw.rect(self.background, black, (x_index*self.cell_width, y_index*self.cell_height, self.cell_width, self.cell_height))
@@ -135,6 +141,9 @@ class App:
                     self.player.move(vec(0, 1))
                 if event.key == pygame.K_UP:
                     self.player.move(vec(0, -1))
+                if event.key == pygame.K_p:
+                    self.state = 'pause'
+                
     
     def playing_update(self):
         self.player.update()
@@ -164,7 +173,78 @@ class App:
         else:
             self.hit()
 
+##################################################### Pause functions #####################################################
+
+
+    def pause_events(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                self.state = 'playing'
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_p:
+                self.state = 'playing'
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_d:
+                self.draw_path('dfs')
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_b:
+                self.draw_path('bfs')
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_u:
+                self.draw_path('ucs')
+    
+    def pause_draw(self):
+        self.draw_text('PAUSED', self.screen, [width//2, height//2], start_text_size + 20, (170, 130, 60), start_font, centered=True)
+        self.draw_text('For DFS - D', self.screen, [width - 120, height//2 - 100], start_text_size - 3, white, start_font)
+        self.draw_text('For BFS - B', self.screen, [width - 120, height//2 - 40], start_text_size - 3, white, start_font)
+        self.draw_text('For UCS - U', self.screen, [width - 120, height//2 + 20], start_text_size - 3, white, start_font)
+        pygame.display.update()
+
+    def draw_path(self, algorithm):
+
+        enemy = self.enemies[0]
+        route = None
+
+        if algorithm == 'bfs':
+
+            enemy.change_personality('bfs')
+            start_time = timer()
+            route = enemy.BFS(enemy.grid_position, self.player.grid_position)
+            end_time = timer()
+            search_time = (end_time - start_time) * 1000
+            self.draw_text('BFS - {}'.format(search_time), self.screen, [
+                width - 120, height // 2 - 10], 14, grey, start_font)
+
+        elif algorithm == 'dfs':
+
+            enemy.change_personality('dfs')
+            start_time = timer()
+            route = enemy.DFS(enemy.grid_position, self.player.grid_position)
+            end_time = timer()
+            search_time = (end_time - start_time) * 1000
+            self.draw_text('DFS - {}'.format(search_time), self.screen, [
+                width - 120, height // 2 - 70], 14, grey, start_font)
+
+        elif algorithm == 'ucs':
+
+            enemy.change_personality('ucs')
+            start_time = timer()
+            route = enemy.UCS(enemy.grid_position, self.player.grid_position)
+            end_time = timer()
+            search_time = (end_time - start_time) * 1000
+            self.draw_text('UCS - {}'.format(search_time), self.screen, [
+                width - 120, height // 2 + 40], 14, grey, start_font)
+
+        for cell_pos in route:
+            pix_pos = self.player.get_pixel_position_from_grid(cell_pos[0], cell_pos[1])
+            pygame.draw.rect(self.screen, green,
+                             (pix_pos[0], pix_pos[1], self.cell_width, self.cell_height))
+
+
+
+
+
+
 ##################################################### Endgame functions #####################################################
+
 
     def endgame_events(self):
         for event in pygame.event.get():

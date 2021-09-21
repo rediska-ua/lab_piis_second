@@ -1,7 +1,12 @@
+from os import pathsep
+import queue
 import pygame, random
+import time
 from settings import *
+from queue import Queue, PriorityQueue
 
 vec = pygame.math.Vector2
+frontier = Queue()
 
 class Enemy:
     def __init__(self, app, position, index):
@@ -13,7 +18,8 @@ class Enemy:
         self.number = index
         self.colour = self.set_colour()
         self.direction = vec(0, 0)
-        self.personality = self.set_personality()
+        self.personality = 'default'
+        self.best_route = None
 
     def get_pixel_position(self):
         return vec((self.grid_position.x*self.app.cell_width) + top_bottom_buffer//2 + self.app.cell_width//2, 
@@ -41,18 +47,170 @@ class Enemy:
     def move(self):
         if self.personality == 'random':
             self.direction = self.get_random_direction()
+        elif self.personality == 'default':
+            self.direction = vec(0, 0)
+        else:
+            self.direction = self.get_path_direction()
+
+
+    def get_path_direction(self):
+        next_cell = self.find_next_cell_in_path()
+        print(next_cell)
+        xdir = next_cell[0] - self.grid_position[0]
+        ydir = next_cell[1] - self.grid_position[1]
+        return vec(xdir, ydir)
+
+    
+    def find_next_cell_in_path(self):
+        path = None
+        if self.personality == 'bfs':
+            path = self.BFS([int(self.grid_position.x), int(self.grid_position.y)], [int(self.app.player.grid_position.x), 
+                int(self.app.player.grid_position.y)])
+        elif self.personality == 'dfs':
+            path = self.DFS([int(self.grid_position.x), int(self.grid_position.y)], [int(self.app.player.grid_position.x), 
+                int(self.app.player.grid_position.y)])
+        elif self.personality == 'ucs':
+            path = self.UCS([int(self.grid_position.x), int(self.grid_position.y)], [int(self.app.player.grid_position.x), 
+                int(self.app.player.grid_position.y)])
+
+        return path[1]
+
+
+    def get_neighbours(self, node):
+
+        neighbours = [[0, -1], [1, 0], [0, 1], [-1, 0]]
+        neighbour_nodes = list(filter(
+            lambda current: (node[0] + current[0] >= 0 and node[0] + current[0] < len(self.app.grid[0])) and
+            (node[1] + current[1] >= 0 and node[1] + current[1] < len(self.app.grid)), neighbours
+        ))
+
+        return neighbour_nodes
+
+
+
+    def BFS(self, start, target):
+        for cell in self.app.walls:
+            if cell.x < 28 and cell.y < 30:
+                self.app.grid[int(cell.y)][int(cell.x)] = 1
+        queue = [start]
+        path = []
+        visited = []
+        while queue:
+            current = queue[0]
+            queue.remove(queue[0])
+            visited.append(current)
+            if current == target:
+                break
+            else:
+                # neighbours = [[0, -1], [1, 0], [0, 1], [-1, 0]]
+                # for neighbour in neighbours:
+                #     if neighbour[0] + current[0] >= 0 and neighbour[0] + current[0] < len(self.app.grid[0]):
+                #         if neighbour[1] + current[1] >= 0 and neighbour[1] + current[1] < len(self.app.grid):
+                neighbours = self.get_neighbours(current)
+                for neighbour in neighbours:
+                    next_cell = [neighbour[0] + current[0], neighbour[1] + current[1]]
+                    if next_cell not in visited:
+                        if self.app.grid[int(next_cell[1])][int(next_cell[0])] != 1:
+                            queue.append(next_cell)
+                            path.append({"Current": current, "Next": next_cell})
+
+        shortest = [target]
+        while target != start:
+            for step in path:
+                if step["Next"] == target:
+                    target = step["Current"]
+                    shortest.insert(0, step["Current"])
+        return shortest
+
+
+    def DFS(self, start_node, target):
+
+        for cell in self.app.walls:
+            if cell.x < 28 and cell.y < 30:
+                self.app.grid[int(cell.y)][int(cell.x)] = 1
+        stack = [start_node]
+        visited = []
+        path = []
+
+        while stack:
+            current = stack.pop()
+            visited.append(current)
+
+            print(current)
+
+            if current == target:
+                break
+            
+            neighbours = self.get_neighbours(current)
+            for neighbour in neighbours:
+                next_cell = [int(neighbour[0] + current[0]), int(neighbour[1] + current[1])]
+                if next_cell not in visited:
+                    if self.app.grid[int(next_cell[1])][int(next_cell[0])] != 1:
+                        stack.append(next_cell)
+                        path.append({"Current": current, "Next": next_cell})
+
+
+        route = [target]
+        while target != start_node:
+            for step in path:
+                 if step["Next"] == target:
+                    target = step["Current"]
+                    route.insert(0, step["Current"])
+
+        # if self.best_route == None:
+        #     self.best_route = real_path
+        # elif len(real_path) < len(self.best_route):
+        #     self.best_route = real_path
+
+        return route
+
+    def UCS(self, start, target):
+
+        for cell in self.app.walls:
+            if cell.x < 28 and cell.y < 30:
+                self.app.grid[int(cell.y)][int(cell.x)] = 1
+
+        queue = PriorityQueue()
+        queue.put((0, start))
+        visited = []
+        path = []
+
+        while not queue.empty():
+            cost, current = queue.get()
+            visited.append(current)
+            if current == target:
+                break
+            neighbours = self.get_neighbours(current)
+            for neighbour in neighbours:
+                next_cell = [neighbour[0] + current[0], neighbour[1] + current[1]]
+                if next_cell not in visited:
+                    if self.app.grid[int(next_cell[1])][int(next_cell[0])] != 1:
+                        queue.put((cost + 1, next_cell))
+                        path.append({"Current": current, "Next": next_cell})
+
+        route = [target]
+        while target != start:
+            for step in path:
+                if step["Next"] == target:
+                    target = step["Current"]
+                    route.insert(0, step["Current"])
+
+        return route
+
+
+
 
     def get_random_direction(self):
         while True:
             number = random.randint(-2, 2)
             if number == -2:
-                x_dir, y_dir = 1,0
+                x_dir, y_dir = 1, 0
             elif number == -1:
-                x_dir, y_dir = 0,1
+                x_dir, y_dir = 0, 1
             elif number == 0:
-                x_dir, y_dir = -1,0
+                x_dir, y_dir = -1, 0
             else:
-                x_dir, y_dir = 0,-1
+                x_dir, y_dir = 0, -1
 
             next_pos = vec(self.grid_position.x + x_dir, self.grid_position.y + y_dir)
             if next_pos not in self.app.walls:
@@ -74,12 +232,5 @@ class Enemy:
         elif self.number == 3:
             return grey
 
-    def set_personality(self):
-        if self.number == 0:
-            return 'speedy'
-        elif self.number == 1:
-            return 'slow'
-        elif self.number == 2:
-            return 'random'
-        else:
-            return 'scared'
+    def change_personality(self, personality):
+        self.personality = personality

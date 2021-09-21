@@ -16,6 +16,7 @@ white = (255, 255, 255)
 yellow = (180, 180, 50)
 blue = (40, 80, 200)
 player_colour = (190, 190, 60)
+green = (0,128,0)
 
 
 start_text_size = 16

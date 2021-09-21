@@ -62,6 +62,10 @@ class Player:
         return vec((self.grid_position.x*self.app.cell_width) + top_bottom_buffer//2 + self.app.cell_width//2, 
         self.grid_position.y*self.app.cell_height  + top_bottom_buffer//2 + self.app.cell_height//2)
 
+    def get_pixel_position_from_grid(self, x, y):
+        return vec(int((x * self.app.cell_width) + top_bottom_buffer // 2),
+                   int((y * self.app.cell_height) + top_bottom_buffer // 2))
+
     def time_to_move(self):
         if int(self.pixel_position.x + top_bottom_buffer//2) % self.app.cell_width == 0:
             if self.direction == vec(1, 0) or self.direction == vec(-1, 0) or self.direction == vec(0, 0):
